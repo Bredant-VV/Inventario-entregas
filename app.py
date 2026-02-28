@@ -9,17 +9,21 @@ app.secret_key = "clave_super_secreta"
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
-# ---------------- CONEXIÓN SEGURA ----------------
+# ---------------- CONEXIÓN ----------------
 
 def get_db():
     if not DATABASE_URL:
         raise Exception("DATABASE_URL no está configurada")
     return psycopg2.connect(DATABASE_URL)
 
+# ---------------- CREAR TABLAS ----------------
+
 def init_db():
     try:
         conn = get_db()
         cur = conn.cursor()
+
+        # Tabla principal
         cur.execute("""
             CREATE TABLE IF NOT EXISTS registros (
                 id TEXT PRIMARY KEY,
@@ -32,6 +36,16 @@ def init_db():
                 fecha TEXT
             );
         """)
+
+        # Tabla catálogo
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS catalogo (
+                id SERIAL PRIMARY KEY,
+                tipo TEXT,
+                valor TEXT
+            );
+        """)
+
         conn.commit()
         cur.close()
         conn.close()
@@ -39,7 +53,6 @@ def init_db():
     except Exception as e:
         print("Error inicializando DB:", e)
 
-# ⚠️ Solo inicializa cuando arranca la app
 with app.app_context():
     init_db()
 
@@ -68,7 +81,7 @@ def logout():
     session.clear()
     return redirect("/")
 
-# ---------------- API ----------------
+# ---------------- API REGISTROS ----------------
 
 @app.route("/api/registros")
 def registros():
@@ -134,6 +147,8 @@ def eliminar(id):
     conn.close()
     return jsonify({"status":"ok"})
 
+# ---------------- API BUSCADOR GLOBAL ----------------
+
 @app.route("/api/buscar/<texto>")
 def buscar(texto):
     conn = get_db()
@@ -164,6 +179,38 @@ def buscar(texto):
     conn.close()
 
     return jsonify([dict(r) for r in rows])
+
+# ---------------- API CATALOGO ----------------
+
+@app.route("/api/catalogo")
+def ver_catalogo():
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    cur.execute("SELECT * FROM catalogo")
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    return jsonify([dict(r) for r in rows])
+
+@app.route("/api/catalogo", methods=["POST"])
+def agregar_catalogo():
+    if not session.get("admin"):
+        return jsonify({"error":"No autorizado"}),403
+
+    data = request.json
+    conn = get_db()
+    cur = conn.cursor()
+
+    cur.execute("""
+        INSERT INTO catalogo (tipo, valor)
+        VALUES (%s,%s)
+    """,(data["tipo"], data["valor"]))
+
+    conn.commit()
+    cur.close()
+    conn.close()
+
+    return jsonify({"status":"ok"})
 
 if __name__ == "__main__":
     app.run(debug=True)
