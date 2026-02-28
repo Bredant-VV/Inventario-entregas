@@ -1,87 +1,49 @@
 from flask import Flask, render_template, request, jsonify, redirect, session
-import csv
-import json
 import os
 from datetime import datetime
+import psycopg2
+import psycopg2.extras
 
 app = Flask(__name__)
 app.secret_key = "clave_super_secreta"
 
-CSV_FILE = "data.csv"
-ENTREGADOS_FILE = "entregados.csv"
-ELIMINADOS_FILE = "eliminados.csv"
-CATALOGO_FILE = "catalogo.json"
+DATABASE_URL = os.environ.get("DATABASE_URL")
 
-FIELDS = ["id","accesorio","modelo","nombre","poo","factura","fecha"]
+def get_db():
+    return psycopg2.connect(DATABASE_URL)
 
-# =========================
-# CSV UTILIDADES
-# =========================
+def init_db():
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS registros (
+            id TEXT PRIMARY KEY,
+            accesorio TEXT,
+            modelo TEXT,
+            nombre TEXT,
+            poo TEXT,
+            factura TEXT,
+            estado TEXT,
+            fecha TEXT
+        );
+    """)
+    conn.commit()
+    cur.close()
+    conn.close()
 
-def ensure_file(file):
-    if not os.path.exists(file):
-        with open(file,"w",newline='',encoding="utf-8") as f:
-            writer = csv.DictWriter(f,fieldnames=FIELDS)
-            writer.writeheader()
+init_db()
 
-def read_csv(file):
-    ensure_file(file)
-    with open(file,newline='',encoding="utf-8") as f:
-        rows = list(csv.DictReader(f))
-        for r in rows:
-            if r.get("id"):
-                r["id"] = r["id"].strip()
-        return rows
-
-def write_csv(file,data):
-    with open(file,"w",newline='',encoding="utf-8") as f:
-        writer = csv.DictWriter(f,fieldnames=FIELDS)
-        writer.writeheader()
-        writer.writerows(data)
-
-def append_csv(file,row):
-    ensure_file(file)
-    if row.get("id"):
-        row["id"] = row["id"].strip()
-    with open(file,"a",newline='',encoding="utf-8") as f:
-        writer = csv.DictWriter(f,fieldnames=FIELDS)
-        writer.writerow(row)
-
-# =========================
-# CATALOGO
-# =========================
-
-def ensure_catalogo():
-    if not os.path.exists(CATALOGO_FILE):
-        default = {
-            "accesorios":["Mouse","Headset","Backpack","Laptop"],
-            "modelos":["Logitech G203","HP Victus","Dell G15"]
-        }
-        with open(CATALOGO_FILE,"w") as f:
-            json.dump(default,f,indent=2)
-
-def read_catalogo():
-    ensure_catalogo()
-    with open(CATALOGO_FILE) as f:
-        return json.load(f)
-
-def write_catalogo(data):
-    with open(CATALOGO_FILE,"w") as f:
-        json.dump(data,f,indent=2)
-
-# =========================
-# VISTAS
-# =========================
+# ---------------- VISTAS ----------------
 
 @app.route("/")
 def index():
     return render_template("index.html")
 
-@app.route("/login",methods=["GET","POST"])
+@app.route("/login", methods=["GET","POST"])
 def login():
-    if request.method=="POST":
-        if request.form.get("password")=="admin123":
-            session["admin"]=True
+    if request.method == "POST":
+        if request.form.get("password") == "admin123":
+            session["admin"] = True
             return redirect("/admin")
     return render_template("login.html")
 
@@ -96,97 +58,76 @@ def logout():
     session.clear()
     return redirect("/")
 
-# =========================
-# API REGISTROS
-# =========================
+# ---------------- API ----------------
 
 @app.route("/api/registros")
 def registros():
-    return jsonify(read_csv(CSV_FILE))
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    cur.execute("SELECT * FROM registros WHERE estado='activo'")
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    return jsonify([dict(r) for r in rows])
 
-@app.route("/api/agregar",methods=["POST"])
+@app.route("/api/agregar", methods=["POST"])
 def agregar():
     if not session.get("admin"):
         return jsonify({"error":"No autorizado"}),403
 
     data = request.json
-    data["id"] = data["id"].strip()
+    conn = get_db()
+    cur = conn.cursor()
+    try:
+        cur.execute("""
+            INSERT INTO registros (id, accesorio, modelo, nombre, poo, factura, estado, fecha)
+            VALUES (%s,%s,%s,%s,%s,%s,'activo',%s)
+        """,(data["id"],data["accesorio"],data["modelo"],
+             data["nombre"],data["poo"],data["factura"],
+             datetime.now().strftime("%Y-%m-%d %H:%M")))
+        conn.commit()
+    except:
+        conn.rollback()
+        return jsonify({"error":"ID ya existe"}),400
 
-    activos = read_csv(CSV_FILE)
-
-    # 🚨 Validar ID único
-    for r in activos:
-        if r["id"] == data["id"]:
-            return jsonify({"error":"ID ya existe"}),400
-
-    data["fecha"]=datetime.now().strftime("%Y-%m-%d %H:%M")
-    append_csv(CSV_FILE,data)
-
+    cur.close()
+    conn.close()
     return jsonify({"status":"ok"})
 
-@app.route("/api/entregado/<id>",methods=["PUT"])
+@app.route("/api/entregado/<id>", methods=["PUT"])
 def entregar(id):
-    if not session.get("admin"):
-        return jsonify({"error":"No autorizado"}),403
-
-    id = id.strip()
-
-    activos = read_csv(CSV_FILE)
-    nuevos = []
-    movido = False
-
-    for r in activos:
-        if r["id"] == id and not movido:
-            append_csv(ENTREGADOS_FILE,r)
-            movido = True
-        else:
-            nuevos.append(r)
-
-    write_csv(CSV_FILE,nuevos)
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("UPDATE registros SET estado='entregado' WHERE id=%s",(id,))
+    conn.commit()
+    cur.close()
+    conn.close()
     return jsonify({"status":"ok"})
 
-@app.route("/api/eliminar/<id>",methods=["DELETE"])
+@app.route("/api/eliminar/<id>", methods=["DELETE"])
 def eliminar(id):
-    if not session.get("admin"):
-        return jsonify({"error":"No autorizado"}),403
-
-    id = id.strip()
-
-    activos = read_csv(CSV_FILE)
-    nuevos = []
-    movido = False
-
-    for r in activos:
-        if r["id"] == id and not movido:
-            append_csv(ELIMINADOS_FILE,r)
-            movido = True
-        else:
-            nuevos.append(r)
-
-    write_csv(CSV_FILE,nuevos)
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("UPDATE registros SET estado='eliminado' WHERE id=%s",(id,))
+    conn.commit()
+    cur.close()
+    conn.close()
     return jsonify({"status":"ok"})
 
-# =========================
-# API CATALOGO
-# =========================
+@app.route("/api/buscar/<texto>")
+def buscar(texto):
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    cur.execute("""
+        SELECT * FROM registros
+        WHERE id ILIKE %s
+        OR nombre ILIKE %s
+        OR accesorio ILIKE %s
+    """,(f"%{texto}%",f"%{texto}%",f"%{texto}%"))
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    return jsonify([dict(r) for r in rows])
 
-@app.route("/api/catalogo")
-def catalogo():
-    return jsonify(read_catalogo())
-
-@app.route("/api/catalogo",methods=["POST"])
-def agregar_catalogo():
-    if not session.get("admin"):
-        return jsonify({"error":"No autorizado"}),403
-
-    data=request.json
-    catalogo=read_catalogo()
-
-    if data["tipo"] in catalogo and data["valor"] not in catalogo[data["tipo"]]:
-        catalogo[data["tipo"]].append(data["valor"])
-        write_catalogo(catalogo)
-
-    return jsonify({"status":"ok"})
-
-if __name__=="__main__":
+if __name__ == "__main__":
     app.run(debug=True)
