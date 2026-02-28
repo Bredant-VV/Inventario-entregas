@@ -10,7 +10,7 @@ app.secret_key = "clave_super_secreta"
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
 def get_db():
-    return psycopg2.connect(DATABASE_URL)
+    return psycopg2.connect(DATABASE_URL, sslmode='require')
 
 def init_db():
     conn = get_db()
@@ -78,16 +78,25 @@ def agregar():
     data = request.json
     conn = get_db()
     cur = conn.cursor()
+
     try:
         cur.execute("""
             INSERT INTO registros (id, accesorio, modelo, nombre, poo, factura, estado, fecha)
             VALUES (%s,%s,%s,%s,%s,%s,'activo',%s)
-        """,(data["id"],data["accesorio"],data["modelo"],
-             data["nombre"],data["poo"],data["factura"],
-             datetime.now().strftime("%Y-%m-%d %H:%M")))
+        """,(
+            data["id"],
+            data["accesorio"],
+            data["modelo"],
+            data["nombre"],
+            data["poo"],
+            data["factura"],
+            datetime.now().strftime("%Y-%m-%d %H:%M")
+        ))
         conn.commit()
-    except:
+    except Exception:
         conn.rollback()
+        cur.close()
+        conn.close()
         return jsonify({"error":"ID ya existe"}),400
 
     cur.close()
@@ -118,15 +127,31 @@ def eliminar(id):
 def buscar(texto):
     conn = get_db()
     cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+
     cur.execute("""
         SELECT * FROM registros
-        WHERE id ILIKE %s
-        OR nombre ILIKE %s
-        OR accesorio ILIKE %s
-    """,(f"%{texto}%",f"%{texto}%",f"%{texto}%"))
+        WHERE
+            id ILIKE %s OR
+            nombre ILIKE %s OR
+            accesorio ILIKE %s OR
+            modelo ILIKE %s OR
+            factura ILIKE %s OR
+            poo ILIKE %s OR
+            estado ILIKE %s
+    """, (
+        f"%{texto}%",
+        f"%{texto}%",
+        f"%{texto}%",
+        f"%{texto}%",
+        f"%{texto}%",
+        f"%{texto}%",
+        f"%{texto}%"
+    ))
+
     rows = cur.fetchall()
     cur.close()
     conn.close()
+
     return jsonify([dict(r) for r in rows])
 
 if __name__ == "__main__":
