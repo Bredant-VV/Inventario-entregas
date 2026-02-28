@@ -9,29 +9,39 @@ app.secret_key = "clave_super_secreta"
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
+# ---------------- CONEXIÓN SEGURA ----------------
+
 def get_db():
-    return psycopg2.connect(DATABASE_URL, sslmode='require')
+    if not DATABASE_URL:
+        raise Exception("DATABASE_URL no está configurada")
+    return psycopg2.connect(DATABASE_URL)
 
 def init_db():
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS registros (
-            id TEXT PRIMARY KEY,
-            accesorio TEXT,
-            modelo TEXT,
-            nombre TEXT,
-            poo TEXT,
-            factura TEXT,
-            estado TEXT,
-            fecha TEXT
-        );
-    """)
-    conn.commit()
-    cur.close()
-    conn.close()
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS registros (
+                id TEXT PRIMARY KEY,
+                accesorio TEXT,
+                modelo TEXT,
+                nombre TEXT,
+                poo TEXT,
+                factura TEXT,
+                estado TEXT,
+                fecha TEXT
+            );
+        """)
+        conn.commit()
+        cur.close()
+        conn.close()
+        print("Base de datos lista")
+    except Exception as e:
+        print("Error inicializando DB:", e)
 
-init_db()
+# ⚠️ Solo inicializa cuando arranca la app
+with app.app_context():
+    init_db()
 
 # ---------------- VISTAS ----------------
 
@@ -81,7 +91,8 @@ def agregar():
 
     try:
         cur.execute("""
-            INSERT INTO registros (id, accesorio, modelo, nombre, poo, factura, estado, fecha)
+            INSERT INTO registros 
+            (id, accesorio, modelo, nombre, poo, factura, estado, fecha)
             VALUES (%s,%s,%s,%s,%s,%s,'activo',%s)
         """,(
             data["id"],
