@@ -11,6 +11,25 @@
 
 <br><br>
 
+<!-- 🔎 BUSCADOR POR POO O FACTURA -->
+<div style="margin:20px 0;">
+    <input 
+        type="text" 
+        id="buscarDoc" 
+        placeholder="Buscar por POO o Factura..."
+        style="padding:8px; width:250px;"
+    >
+    <button onclick="buscarDocumento()" style="padding:8px;">
+        Buscar
+    </button>
+    <button onclick="cargar()" style="padding:8px;">
+        Mostrar activos
+    </button>
+</div>
+
+<hr>
+
+<!-- FORMULARIO -->
 <input id="id" placeholder="ID">
 <select id="accesorio"></select>
 <select id="modelo"></select>
@@ -33,28 +52,45 @@
 
 <script>
 
+// ================= CARGAR CATALOGO =================
+
 async function cargarCatalogo(){
-    const res=await fetch("/api/catalogo");
-    const data=await res.json();
-    accesorio.innerHTML=data.accesorios.map(a=>`<option>${a}</option>`).join("");
-    modelo.innerHTML=data.modelos.map(m=>`<option>${m}</option>`).join("");
+    const res = await fetch("/api/catalogo");
+    const data = await res.json();
+
+    const accesorios = data.filter(item => item.tipo === "accesorio");
+    const modelos = data.filter(item => item.tipo === "modelo");
+
+    document.getElementById("accesorio").innerHTML =
+        accesorios.map(a => `<option>${a.valor}</option>`).join("");
+
+    document.getElementById("modelo").innerHTML =
+        modelos.map(m => `<option>${m.valor}</option>`).join("");
 }
 
-async function cargar(){
-    const res=await fetch("/api/registros");
-    const data=await res.json();
+// ================= CARGAR REGISTROS =================
 
-    cards.innerHTML=data.map(r=>`
+async function cargar(){
+    const res = await fetch("/api/registros");
+    const data = await res.json();
+    pintar(data);
+}
+
+function pintar(data){
+    document.getElementById("cards").innerHTML = data.map(r=>`
         <div class="card small">
             <b>${r.id}</b>
             <div>${r.accesorio}</div>
             <div>${r.modelo}</div>
             <div>${r.nombre}</div>
-            <button type="button" onclick="entregar('${r.id}')">Entregado</button>
-            <button type="button" onclick="eliminarR('${r.id}')">Eliminar</button>
+            <div><small>${r.estado}</small></div>
+            <button onclick="entregar('${r.id}')">Entregado</button>
+            <button onclick="eliminarR('${r.id}')">Eliminar</button>
         </div>
     `).join("");
 }
+
+// ================= AGREGAR REGISTRO =================
 
 async function agregar(){
     await fetch("/api/agregar",{
@@ -70,9 +106,15 @@ async function agregar(){
         })
     });
 
-    id.value="";nombre.value="";poo.value="";factura.value="";
+    id.value="";
+    nombre.value="";
+    poo.value="";
+    factura.value="";
+
     cargar();
 }
+
+// ================= ENTREGAR / ELIMINAR =================
 
 async function entregar(id){
     await fetch("/api/entregado/"+id,{method:"PUT"});
@@ -84,11 +126,13 @@ async function eliminarR(id){
     cargar();
 }
 
+// ================= AGREGAR CATALOGO =================
+
 async function agregarAcc(){
     await fetch("/api/catalogo",{
         method:"POST",
         headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({tipo:"accesorios",valor:nuevoAcc.value})
+        body:JSON.stringify({tipo:"accesorio",valor:nuevoAcc.value})
     });
     nuevoAcc.value="";
     cargarCatalogo();
@@ -98,11 +142,36 @@ async function agregarMod(){
     await fetch("/api/catalogo",{
         method:"POST",
         headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({tipo:"modelos",valor:nuevoMod.value})
+        body:JSON.stringify({tipo:"modelo",valor:nuevoMod.value})
     });
     nuevoMod.value="";
     cargarCatalogo();
 }
+
+// ================= BUSCAR POR POO / FACTURA =================
+
+async function buscarDocumento(){
+    const valor = document.getElementById("buscarDoc").value.trim();
+
+    if(!valor){
+        cargar();
+        return;
+    }
+
+    const res = await fetch("/api/buscar/"+valor);
+    const data = await res.json();
+
+    pintar(data);
+}
+
+// Enter para buscar
+document.getElementById("buscarDoc").addEventListener("keypress", function(e){
+    if(e.key === "Enter"){
+        buscarDocumento();
+    }
+});
+
+// ================= INIT =================
 
 cargarCatalogo();
 cargar();

@@ -23,7 +23,7 @@ def init_db():
         conn = get_db()
         cur = conn.cursor()
 
-        # Tabla principal
+        # Tabla registros
         cur.execute("""
             CREATE TABLE IF NOT EXISTS registros (
                 id TEXT PRIMARY KEY,
@@ -45,6 +45,18 @@ def init_db():
                 valor TEXT
             );
         """)
+
+        # Insertar valores por defecto si no existen
+        cur.execute("SELECT COUNT(*) FROM catalogo;")
+        total = cur.fetchone()[0]
+
+        if total == 0:
+            cur.execute("INSERT INTO catalogo (tipo, valor) VALUES ('accesorio','Mouse')")
+            cur.execute("INSERT INTO catalogo (tipo, valor) VALUES ('accesorio','Headset')")
+            cur.execute("INSERT INTO catalogo (tipo, valor) VALUES ('accesorio','Backpack')")
+            cur.execute("INSERT INTO catalogo (tipo, valor) VALUES ('modelo','Logitech G203')")
+            cur.execute("INSERT INTO catalogo (tipo, valor) VALUES ('modelo','HP Victus')")
+            cur.execute("INSERT INTO catalogo (tipo, valor) VALUES ('modelo','Dell G15')")
 
         conn.commit()
         cur.close()
@@ -147,7 +159,7 @@ def eliminar(id):
     conn.close()
     return jsonify({"status":"ok"})
 
-# ---------------- API BUSCADOR GLOBAL ----------------
+# ---------------- BUSCADOR GLOBAL ----------------
 
 @app.route("/api/buscar/<texto>")
 def buscar(texto):
@@ -157,22 +169,9 @@ def buscar(texto):
     cur.execute("""
         SELECT * FROM registros
         WHERE
-            id ILIKE %s OR
-            nombre ILIKE %s OR
-            accesorio ILIKE %s OR
-            modelo ILIKE %s OR
-            factura ILIKE %s OR
-            poo ILIKE %s OR
-            estado ILIKE %s
-    """, (
-        f"%{texto}%",
-        f"%{texto}%",
-        f"%{texto}%",
-        f"%{texto}%",
-        f"%{texto}%",
-        f"%{texto}%",
-        f"%{texto}%"
-    ))
+            poo = %s OR
+            factura = %s
+    """, (texto, texto))
 
     rows = cur.fetchall()
     cur.close()
@@ -186,10 +185,13 @@ def buscar(texto):
 def ver_catalogo():
     conn = get_db()
     cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+
     cur.execute("SELECT * FROM catalogo")
     rows = cur.fetchall()
+
     cur.close()
     conn.close()
+
     return jsonify([dict(r) for r in rows])
 
 @app.route("/api/catalogo", methods=["POST"])
