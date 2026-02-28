@@ -9,67 +9,57 @@ app.secret_key = "clave_super_secreta"
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
 
-# ---------------- CONEXIÓN ----------------
-
+# ---------- CONEXIÓN ----------
 def get_db():
     if not DATABASE_URL:
-        raise Exception("DATABASE_URL no está configurada")
-    return psycopg2.connect(DATABASE_URL)
+        raise Exception("DATABASE_URL no configurada")
+    return psycopg2.connect(DATABASE_URL, sslmode="require")
 
-# ---------------- CREAR TABLAS ----------------
-
+# ---------- CREAR TABLAS ----------
 def init_db():
-    try:
-        conn = get_db()
-        cur = conn.cursor()
+    conn = get_db()
+    cur = conn.cursor()
 
-        # Tabla registros
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS registros (
-                id TEXT PRIMARY KEY,
-                accesorio TEXT,
-                modelo TEXT,
-                nombre TEXT,
-                poo TEXT,
-                factura TEXT,
-                estado TEXT,
-                fecha TEXT
-            );
-        """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS registros (
+            id TEXT PRIMARY KEY,
+            accesorio TEXT,
+            modelo TEXT,
+            nombre TEXT,
+            poo TEXT,
+            factura TEXT,
+            estado TEXT,
+            fecha TEXT
+        );
+    """)
 
-        # Tabla catálogo
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS catalogo (
-                id SERIAL PRIMARY KEY,
-                tipo TEXT,
-                valor TEXT
-            );
-        """)
+    cur.execute("""
+        CREATE TABLE IF NOT EXISTS catalogo (
+            id SERIAL PRIMARY KEY,
+            tipo TEXT,
+            valor TEXT
+        );
+    """)
 
-        # Insertar valores por defecto si no existen
-        cur.execute("SELECT COUNT(*) FROM catalogo;")
-        total = cur.fetchone()[0]
+    cur.execute("SELECT COUNT(*) FROM catalogo;")
+    total = cur.fetchone()[0]
 
-        if total == 0:
-            cur.execute("INSERT INTO catalogo (tipo, valor) VALUES ('accesorio','Mouse')")
-            cur.execute("INSERT INTO catalogo (tipo, valor) VALUES ('accesorio','Headset')")
-            cur.execute("INSERT INTO catalogo (tipo, valor) VALUES ('accesorio','Backpack')")
-            cur.execute("INSERT INTO catalogo (tipo, valor) VALUES ('modelo','Logitech G203')")
-            cur.execute("INSERT INTO catalogo (tipo, valor) VALUES ('modelo','HP Victus')")
-            cur.execute("INSERT INTO catalogo (tipo, valor) VALUES ('modelo','Dell G15')")
+    if total == 0:
+        cur.execute("INSERT INTO catalogo (tipo, valor) VALUES ('accesorio','Mouse')")
+        cur.execute("INSERT INTO catalogo (tipo, valor) VALUES ('accesorio','Headset')")
+        cur.execute("INSERT INTO catalogo (tipo, valor) VALUES ('accesorio','Backpack')")
+        cur.execute("INSERT INTO catalogo (tipo, valor) VALUES ('modelo','Logitech G203')")
+        cur.execute("INSERT INTO catalogo (tipo, valor) VALUES ('modelo','HP Victus')")
+        cur.execute("INSERT INTO catalogo (tipo, valor) VALUES ('modelo','Dell G15')")
 
-        conn.commit()
-        cur.close()
-        conn.close()
-        print("Base de datos lista")
-    except Exception as e:
-        print("Error inicializando DB:", e)
+    conn.commit()
+    cur.close()
+    conn.close()
 
 with app.app_context():
     init_db()
 
-# ---------------- VISTAS ----------------
-
+# ---------- VISTAS ----------
 @app.route("/")
 def index():
     return render_template("index.html")
@@ -93,8 +83,7 @@ def logout():
     session.clear()
     return redirect("/")
 
-# ---------------- API REGISTROS ----------------
-
+# ---------- API REGISTROS ----------
 @app.route("/api/registros")
 def registros():
     conn = get_db()
@@ -129,10 +118,8 @@ def agregar():
             datetime.now().strftime("%Y-%m-%d %H:%M")
         ))
         conn.commit()
-    except Exception:
+    except:
         conn.rollback()
-        cur.close()
-        conn.close()
         return jsonify({"error":"ID ya existe"}),400
 
     cur.close()
@@ -159,39 +146,28 @@ def eliminar(id):
     conn.close()
     return jsonify({"status":"ok"})
 
-# ---------------- BUSCADOR GLOBAL ----------------
-
-@app.route("/api/buscar/<texto>")
-def buscar(texto):
+@app.route("/api/buscar/<valor>")
+def buscar(valor):
     conn = get_db()
     cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-
     cur.execute("""
         SELECT * FROM registros
-        WHERE
-            poo = %s OR
-            factura = %s
-    """, (texto, texto))
-
+        WHERE poo = %s OR factura = %s
+    """,(valor,valor))
     rows = cur.fetchall()
     cur.close()
     conn.close()
-
     return jsonify([dict(r) for r in rows])
 
-# ---------------- API CATALOGO ----------------
-
+# ---------- API CATALOGO ----------
 @app.route("/api/catalogo")
-def ver_catalogo():
+def catalogo():
     conn = get_db()
     cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-
     cur.execute("SELECT * FROM catalogo")
     rows = cur.fetchall()
-
     cur.close()
     conn.close()
-
     return jsonify([dict(r) for r in rows])
 
 @app.route("/api/catalogo", methods=["POST"])
@@ -202,17 +178,9 @@ def agregar_catalogo():
     data = request.json
     conn = get_db()
     cur = conn.cursor()
-
-    cur.execute("""
-        INSERT INTO catalogo (tipo, valor)
-        VALUES (%s,%s)
-    """,(data["tipo"], data["valor"]))
-
+    cur.execute("INSERT INTO catalogo (tipo, valor) VALUES (%s,%s)",
+                (data["tipo"], data["valor"]))
     conn.commit()
     cur.close()
     conn.close()
-
     return jsonify({"status":"ok"})
-
-if __name__ == "__main__":
-    app.run(debug=True)

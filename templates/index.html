@@ -6,32 +6,21 @@
 </head>
 <body>
 
-<h1>Mis Entregas</h1>
+    <h1>Mis Entregas</h1>
+    <a href="/login">Administrador</a>
+    <div id="cards"></div>
 
-<div id="cards" class="cards"></div>
-
-<script>
-
-async function cargar(){
-    const res = await fetch("/api/registros");
-    const data = await res.json();
-
-    cards.innerHTML = data.map(r=>`
-        <div class="card">
-            <h3>${r.id}</h3>
-            <p><b>Accesorio:</b> ${r.accesorio}</p>
-            <p><b>Modelo:</b> ${r.modelo}</p>
-            <p><b>Nombre:</b> ${r.nombre}</p>
-        </div>
-    `).join("");
-}
-
-// 🔁 Refresco automático cada 3 segundos
-setInterval(cargar, 3000);
-
-cargar();
-
-</script>
+    <script>
+    async function cargar(){
+        const res=await fetch("/api/registros");
+        const data=await res.json();
+        document.getElementById("cards").innerHTML =
+            data.map(r=>`<div>
+                <b>${r.id}</b> - ${r.accesorio} - ${r.modelo} - ${r.nombre}
+            </div>`).join("");
+    }
+    cargar();
+    </script>
 
 </body>
 </html>
