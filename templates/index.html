@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Mis Entregas</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<h1>Mis Entregas</h1>
+
+<div id="cards" class="cards"></div>
+
+<script>
+
+async function cargar(){
+    const res = await fetch("/api/registros");
+    const data = await res.json();
+
+    cards.innerHTML = data.map(r=>`
+        <div class="card">
+            <h3>${r.id}</h3>
+            <p><b>Accesorio:</b> ${r.accesorio}</p>
+            <p><b>Modelo:</b> ${r.modelo}</p>
+            <p><b>Nombre:</b> ${r.nombre}</p>
+        </div>
+    `).join("");
+}
+
+// 🔁 Refresco automático cada 3 segundos
+setInterval(cargar, 3000);
+
+cargar();
+
+</script>
+
+</body>
+</html>

@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Administrador</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<h1>Administrador</h1>
+<a href="/logout">Cerrar sesión</a>
+
+<br><br>
+
+<input id="id" placeholder="ID">
+<select id="accesorio"></select>
+<select id="modelo"></select>
+<input id="nombre" placeholder="Nombre">
+<input id="poo" placeholder="POO">
+<input id="factura" placeholder="Factura">
+<button type="button" onclick="agregar()">Agregar</button>
+
+<br><br>
+
+<input id="nuevoAcc" placeholder="Nuevo accesorio">
+<button type="button" onclick="agregarAcc()">Agregar accesorio</button>
+
+<input id="nuevoMod" placeholder="Nuevo modelo">
+<button type="button" onclick="agregarMod()">Agregar modelo</button>
+
+<hr>
+
+<div id="cards" class="cards"></div>
+
+<script>
+
+async function cargarCatalogo(){
+    const res=await fetch("/api/catalogo");
+    const data=await res.json();
+    accesorio.innerHTML=data.accesorios.map(a=>`<option>${a}</option>`).join("");
+    modelo.innerHTML=data.modelos.map(m=>`<option>${m}</option>`).join("");
+}
+
+async function cargar(){
+    const res=await fetch("/api/registros");
+    const data=await res.json();
+
+    cards.innerHTML=data.map(r=>`
+        <div class="card small">
+            <b>${r.id}</b>
+            <div>${r.accesorio}</div>
+            <div>${r.modelo}</div>
+            <div>${r.nombre}</div>
+            <button type="button" onclick="entregar('${r.id}')">Entregado</button>
+            <button type="button" onclick="eliminarR('${r.id}')">Eliminar</button>
+        </div>
+    `).join("");
+}
+
+async function agregar(){
+    await fetch("/api/agregar",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({
+            id:id.value,
+            accesorio:accesorio.value,
+            modelo:modelo.value,
+            nombre:nombre.value,
+            poo:poo.value,
+            factura:factura.value
+        })
+    });
+
+    id.value="";nombre.value="";poo.value="";factura.value="";
+    cargar();
+}
+
+async function entregar(id){
+    await fetch("/api/entregado/"+id,{method:"PUT"});
+    cargar();
+}
+
+async function eliminarR(id){
+    await fetch("/api/eliminar/"+id,{method:"DELETE"});
+    cargar();
+}
+
+async function agregarAcc(){
+    await fetch("/api/catalogo",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({tipo:"accesorios",valor:nuevoAcc.value})
+    });
+    nuevoAcc.value="";
+    cargarCatalogo();
+}
+
+async function agregarMod(){
+    await fetch("/api/catalogo",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({tipo:"modelos",valor:nuevoMod.value})
+    });
+    nuevoMod.value="";
+    cargarCatalogo();
+}
+
+cargarCatalogo();
+cargar();
+
+</script>
+
+</body>
+</html>

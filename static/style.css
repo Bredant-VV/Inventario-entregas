@@ -1,0 +1,45 @@
+body{
+    background:#0b0f19;
+    color:white;
+    font-family:Inter,system-ui;
+    padding:40px;
+}
+
+.cards{
+    display:grid;
+    grid-template-columns:repeat(auto-fill,minmax(160px,1fr));
+    gap:15px;
+}
+
+.card{
+    background:#111827;
+    border-radius:14px;
+    padding:12px;
+    border:1px solid #1f2937;
+}
+
+.small{font-size:13px;}
+
+button{
+    margin-top:6px;
+    padding:6px 8px;
+    background:#2563eb;
+    border:none;
+    border-radius:8px;
+    color:white;
+    cursor:pointer;
+}
+
+button:hover{background:#1d4ed8;}
+
+.success{border-left:4px solid #22c55e;}
+.danger{border-left:4px solid #ef4444;}
+
+input,select{
+    padding:8px;
+    margin:5px;
+    background:#111827;
+    border:1px solid #1f2937;
+    color:white;
+    border-radius:8px;
+}
