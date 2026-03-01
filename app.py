@@ -1,8 +1,10 @@
-from flask import Flask, render_template, request, jsonify, redirect, session
+from flask import Flask, render_template, request, jsonify, redirect, session, send_file
 import os
 from datetime import datetime
 import psycopg2
 import psycopg2.extras
+import pandas as pd
+import io
 
 app = Flask(__name__)
 app.secret_key = "clave_super_secreta"
@@ -93,7 +95,6 @@ def logout():
 
 # ---------------- API REGISTROS ----------------
 
-# 🔹 Activos (estos son los que ve el usuario en "Mis entregas")
 @app.route("/api/registros")
 def registros():
     conn = get_db()
@@ -111,7 +112,6 @@ def registros():
 
     return jsonify([dict(r) for r in rows])
 
-# 🔹 Agregar registro
 @app.route("/api/agregar", methods=["POST"])
 def agregar():
     if not session.get("admin"):
@@ -146,7 +146,6 @@ def agregar():
     conn.close()
     return jsonify({"status":"ok"})
 
-# 🔹 Marcar como entregado (desaparece del usuario)
 @app.route("/api/entregado/<id>", methods=["PUT"])
 def entregar(id):
     conn = get_db()
@@ -164,7 +163,6 @@ def entregar(id):
 
     return jsonify({"status":"ok"})
 
-# 🔹 Eliminar
 @app.route("/api/eliminar/<id>", methods=["DELETE"])
 def eliminar(id):
     conn = get_db()
@@ -182,7 +180,6 @@ def eliminar(id):
 
     return jsonify({"status":"ok"})
 
-# 🔹 Buscar por POO o Factura
 @app.route("/api/buscar/<valor>")
 def buscar(valor):
     conn = get_db()
@@ -240,4 +237,40 @@ def agregar_catalogo():
 
     return jsonify({"status":"ok"})
 
+# ---------------- RESPALDO MANUAL ----------------
+
+@app.route("/api/respaldo")
+def respaldo_manual():
+
+    if not session.get("admin"):
+        return jsonify({"error":"No autorizado"}),403
+
+    conn = get_db()
+
+    activos = pd.read_sql("SELECT * FROM registros WHERE estado='activo'", conn)
+    entregados = pd.read_sql("SELECT * FROM registros WHERE estado='entregado'", conn)
+    eliminados = pd.read_sql("SELECT * FROM registros WHERE estado='eliminado'", conn)
+
+    output = io.BytesIO()
+
+    with pd.ExcelWriter(output, engine='openpyxl') as writer:
+        activos.to_excel(writer, sheet_name="Activos", index=False)
+        entregados.to_excel(writer, sheet_name="Entregados", index=False)
+        eliminados.to_excel(writer, sheet_name="Eliminados", index=False)
+
+    output.seek(0)
+    conn.close()
+
+    fecha = datetime.now().strftime("%Y-%m-%d")
+
+    return send_file(
+        output,
+        download_name=f"respaldo_{fecha}.xlsx",
+        as_attachment=True
+    )
+
 # ---------------- SERVIDOR ----------------
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host="0.0.0.0", port=port)

@@ -9,6 +9,10 @@
 <h1>Administrador</h1>
 <a href="/logout">Cerrar sesión</a>
 
+<br><br>
+
+<button onclick="descargarRespaldo()">Descargar Respaldo</button>
+
 <div class="search">
     <input type="text" id="buscar" placeholder="Buscar por POO o Factura...">
     <button onclick="buscarDoc()">Buscar</button>
@@ -40,62 +44,110 @@
 <div id="cards" class="cards"></div>
 
 <script>
+
+// 🔹 DESCARGAR RESPALDO
+function descargarRespaldo(){
+    window.location.href = "/api/respaldo";
+}
+
+// 🔹 CARGAR CATALOGO
 async function cargarCatalogo(){
-    const res = await fetch("/api/catalogo");
-    const data = await res.json();
+    try {
+        const res = await fetch("/api/catalogo");
+        const data = await res.json();
 
-    accesorio.innerHTML = data.accesorios.map(a=>`<option>${a}</option>`).join("");
-    modelo.innerHTML = data.modelos.map(m=>`<option>${m}</option>`).join("");
+        document.getElementById("accesorio").innerHTML =
+            data.accesorios.map(a=>`<option>${a}</option>`).join("");
+
+        document.getElementById("modelo").innerHTML =
+            data.modelos.map(m=>`<option>${m}</option>`).join("");
+
+    } catch (e) {
+        console.error("Error cargando catálogo", e);
+    }
 }
 
+// 🔹 CARGAR REGISTROS ACTIVOS
 async function cargar(){
-    const res = await fetch("/api/registros");
-    const data = await res.json();
+    try {
+        const res = await fetch("/api/registros");
+        const data = await res.json();
 
-    cards.innerHTML = data.map(r=>`
-        <div class="card">
-            <b>${r.id}</b>
-            <div>${r.accesorio}</div>
-            <div>${r.modelo}</div>
-            <div>${r.nombre}</div>
-            <button onclick="entregar('${r.id}')">Entregado</button>
-            <button onclick="eliminarR('${r.id}')">Eliminar</button>
-        </div>
-    `).join("");
+        const contenedor = document.getElementById("cards");
+
+        if (!data || data.length === 0) {
+            contenedor.innerHTML = "<p>No hay registros activos.</p>";
+            return;
+        }
+
+        contenedor.innerHTML = data.map(r=>`
+            <div class="card">
+                <b>${r.id}</b>
+                <div>${r.accesorio}</div>
+                <div>${r.modelo}</div>
+                <div>${r.nombre}</div>
+                <button onclick="entregar('${r.id}')">Entregado</button>
+                <button onclick="eliminarR('${r.id}')">Eliminar</button>
+            </div>
+        `).join("");
+
+    } catch (e) {
+        console.error("Error cargando registros", e);
+    }
 }
 
+// 🔹 AGREGAR REGISTRO
 async function agregar(){
     await fetch("/api/agregar",{
         method:"POST",
         headers:{"Content-Type":"application/json"},
         body:JSON.stringify({
-            id:id.value,
-            accesorio:accesorio.value,
-            modelo:modelo.value,
-            nombre:nombre.value,
-            poo:poo.value,
-            factura:factura.value
+            id:document.getElementById("id").value,
+            accesorio:document.getElementById("accesorio").value,
+            modelo:document.getElementById("modelo").value,
+            nombre:document.getElementById("nombre").value,
+            poo:document.getElementById("poo").value,
+            factura:document.getElementById("factura").value
         })
     });
+
+    // 🔥 Limpiar campos
+    document.getElementById("id").value = "";
+    document.getElementById("nombre").value = "";
+    document.getElementById("poo").value = "";
+    document.getElementById("factura").value = "";
+
     cargar();
 }
 
+// 🔹 MARCAR ENTREGADO
 async function entregar(id){
     await fetch("/api/entregado/"+id,{method:"PUT"});
     cargar();
 }
 
+// 🔹 ELIMINAR
 async function eliminarR(id){
     await fetch("/api/eliminar/"+id,{method:"DELETE"});
     cargar();
 }
 
+// 🔹 BUSCAR
 async function buscarDoc(){
-    const valor = buscar.value;
+    const valor = document.getElementById("buscar").value.trim();
+    if (!valor) return;
+
     const res = await fetch("/api/buscar/"+valor);
     const data = await res.json();
 
-    cards.innerHTML = data.map(r=>`
+    const contenedor = document.getElementById("cards");
+
+    if (!data || data.length === 0) {
+        contenedor.innerHTML = "<p>No se encontraron resultados.</p>";
+        return;
+    }
+
+    contenedor.innerHTML = data.map(r=>`
         <div class="card">
             <b>${r.id}</b>
             <div>${r.accesorio}</div>
@@ -105,26 +157,50 @@ async function buscarDoc(){
     `).join("");
 }
 
+// 🔹 AGREGAR ACCESORIO
 async function agregarAcc(){
+    const valor = document.getElementById("nuevoAcc").value;
+    if (!valor) return;
+
     await fetch("/api/catalogo",{
         method:"POST",
         headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({tipo:"accesorio",valor:nuevoAcc.value})
+        body:JSON.stringify({tipo:"accesorio",valor:valor})
     });
+
+    document.getElementById("nuevoAcc").value = "";
     cargarCatalogo();
 }
 
+// 🔹 AGREGAR MODELO
 async function agregarMod(){
+    const valor = document.getElementById("nuevoMod").value;
+    if (!valor) return;
+
     await fetch("/api/catalogo",{
         method:"POST",
         headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({tipo:"modelo",valor:nuevoMod.value})
+        body:JSON.stringify({tipo:"modelo",valor:valor})
     });
+
+    document.getElementById("nuevoMod").value = "";
     cargarCatalogo();
 }
 
+// 🔹 ENTER PARA BUSCAR
+document.getElementById("buscar").addEventListener("keypress", function(e){
+    if(e.key === "Enter"){
+        buscarDoc();
+    }
+});
+
+// 🔥 AUTO-REFRESH ADMIN CADA 5 SEGUNDOS
+setInterval(cargar, 5000);
+
+// 🔹 CARGA INICIAL
 cargarCatalogo();
 cargar();
+
 </script>
 
 </body>

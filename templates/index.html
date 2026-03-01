@@ -15,28 +15,47 @@
 
 <script>
 
+let ultimaData = "";
+
+// Función para cargar registros activos
 async function cargar() {
-    const res = await fetch("/api/registros");
-    const data = await res.json();
+    try {
+        const res = await fetch("/api/registros");
+        const data = await res.json();
 
-    const contenedor = document.getElementById("cards");
+        const nuevaData = JSON.stringify(data);
 
-    if (data.length === 0) {
-        contenedor.innerHTML = "<p>No hay pedidos pendientes.</p>";
-        return;
+        // Solo actualizar si cambió algo (evita parpadeos)
+        if (nuevaData !== ultimaData) {
+            ultimaData = nuevaData;
+
+            const contenedor = document.getElementById("cards");
+
+            if (data.length === 0) {
+                contenedor.innerHTML = "<p>No hay pedidos pendientes.</p>";
+                return;
+            }
+
+            contenedor.innerHTML = data.map(r => `
+                <div class="card">
+                    <h3>${r.id}</h3>
+                    <p><strong>Accesorio:</strong> ${r.accesorio}</p>
+                    <p><strong>Modelo:</strong> ${r.modelo}</p>
+                    <p><strong>Nombre:</strong> ${r.nombre}</p>
+                </div>
+            `).join("");
+        }
+
+    } catch (error) {
+        console.error("Error cargando registros:", error);
     }
-
-    contenedor.innerHTML = data.map(r => `
-        <div class="card">
-            <h3>${r.id}</h3>
-            <p>${r.accesorio}</p>
-            <p>${r.modelo}</p>
-            <p>${r.nombre}</p>
-        </div>
-    `).join("");
 }
 
+// Cargar al iniciar
 cargar();
+
+
+setInterval(cargar, 10000);
 
 </script>
 

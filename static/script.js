@@ -21,6 +21,10 @@ async function cargarRegistros() {
     });
 }
 
+function descargarRespaldo(){
+    window.location.href = "/api/respaldo";
+}
+
 async function agregarRegistro() {
     const nuevo = {
         id: id.value,
