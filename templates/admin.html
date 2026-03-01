@@ -9,88 +9,60 @@
 <h1>Administrador</h1>
 <a href="/logout">Cerrar sesión</a>
 
-<br><br>
-
-<!-- 🔎 BUSCADOR POR POO O FACTURA -->
-<div style="margin:20px 0;">
-    <input 
-        type="text" 
-        id="buscarDoc" 
-        placeholder="Buscar por POO o Factura..."
-        style="padding:8px; width:250px;"
-    >
-    <button onclick="buscarDocumento()" style="padding:8px;">
-        Buscar
-    </button>
-    <button onclick="cargar()" style="padding:8px;">
-        Mostrar activos
-    </button>
+<div class="search">
+    <input type="text" id="buscar" placeholder="Buscar por POO o Factura...">
+    <button onclick="buscarDoc()">Buscar</button>
+    <button onclick="cargar()">Mostrar activos</button>
 </div>
 
 <hr>
 
-<!-- FORMULARIO -->
-<input id="id" placeholder="ID">
-<select id="accesorio"></select>
-<select id="modelo"></select>
-<input id="nombre" placeholder="Nombre">
-<input id="poo" placeholder="POO">
-<input id="factura" placeholder="Factura">
-<button type="button" onclick="agregar()">Agregar</button>
+<div class="form">
+    <input id="id" placeholder="ID">
+    <select id="accesorio"></select>
+    <select id="modelo"></select>
+    <input id="nombre" placeholder="Nombre">
+    <input id="poo" placeholder="POO">
+    <input id="factura" placeholder="Factura">
+    <button onclick="agregar()">Agregar</button>
+</div>
 
-<br><br>
+<div class="catalogo">
+    <input id="nuevoAcc" placeholder="Nuevo accesorio">
+    <button onclick="agregarAcc()">Agregar accesorio</button>
 
-<input id="nuevoAcc" placeholder="Nuevo accesorio">
-<button type="button" onclick="agregarAcc()">Agregar accesorio</button>
-
-<input id="nuevoMod" placeholder="Nuevo modelo">
-<button type="button" onclick="agregarMod()">Agregar modelo</button>
+    <input id="nuevoMod" placeholder="Nuevo modelo">
+    <button onclick="agregarMod()">Agregar modelo</button>
+</div>
 
 <hr>
 
 <div id="cards" class="cards"></div>
 
 <script>
-
-// ================= CARGAR CATALOGO =================
-
 async function cargarCatalogo(){
     const res = await fetch("/api/catalogo");
     const data = await res.json();
 
-    const accesorios = data.filter(item => item.tipo === "accesorio");
-    const modelos = data.filter(item => item.tipo === "modelo");
-
-    document.getElementById("accesorio").innerHTML =
-        accesorios.map(a => `<option>${a.valor}</option>`).join("");
-
-    document.getElementById("modelo").innerHTML =
-        modelos.map(m => `<option>${m.valor}</option>`).join("");
+    accesorio.innerHTML = data.accesorios.map(a=>`<option>${a}</option>`).join("");
+    modelo.innerHTML = data.modelos.map(m=>`<option>${m}</option>`).join("");
 }
-
-// ================= CARGAR REGISTROS =================
 
 async function cargar(){
     const res = await fetch("/api/registros");
     const data = await res.json();
-    pintar(data);
-}
 
-function pintar(data){
-    document.getElementById("cards").innerHTML = data.map(r=>`
-        <div class="card small">
+    cards.innerHTML = data.map(r=>`
+        <div class="card">
             <b>${r.id}</b>
             <div>${r.accesorio}</div>
             <div>${r.modelo}</div>
             <div>${r.nombre}</div>
-            <div><small>${r.estado}</small></div>
             <button onclick="entregar('${r.id}')">Entregado</button>
             <button onclick="eliminarR('${r.id}')">Eliminar</button>
         </div>
     `).join("");
 }
-
-// ================= AGREGAR REGISTRO =================
 
 async function agregar(){
     await fetch("/api/agregar",{
@@ -105,16 +77,8 @@ async function agregar(){
             factura:factura.value
         })
     });
-
-    id.value="";
-    nombre.value="";
-    poo.value="";
-    factura.value="";
-
     cargar();
 }
-
-// ================= ENTREGAR / ELIMINAR =================
 
 async function entregar(id){
     await fetch("/api/entregado/"+id,{method:"PUT"});
@@ -126,7 +90,20 @@ async function eliminarR(id){
     cargar();
 }
 
-// ================= AGREGAR CATALOGO =================
+async function buscarDoc(){
+    const valor = buscar.value;
+    const res = await fetch("/api/buscar/"+valor);
+    const data = await res.json();
+
+    cards.innerHTML = data.map(r=>`
+        <div class="card">
+            <b>${r.id}</b>
+            <div>${r.accesorio}</div>
+            <div>${r.modelo}</div>
+            <div>${r.nombre}</div>
+        </div>
+    `).join("");
+}
 
 async function agregarAcc(){
     await fetch("/api/catalogo",{
@@ -134,7 +111,6 @@ async function agregarAcc(){
         headers:{"Content-Type":"application/json"},
         body:JSON.stringify({tipo:"accesorio",valor:nuevoAcc.value})
     });
-    nuevoAcc.value="";
     cargarCatalogo();
 }
 
@@ -144,38 +120,11 @@ async function agregarMod(){
         headers:{"Content-Type":"application/json"},
         body:JSON.stringify({tipo:"modelo",valor:nuevoMod.value})
     });
-    nuevoMod.value="";
     cargarCatalogo();
 }
 
-// ================= BUSCAR POR POO / FACTURA =================
-
-async function buscarDocumento(){
-    const valor = document.getElementById("buscarDoc").value.trim();
-
-    if(!valor){
-        cargar();
-        return;
-    }
-
-    const res = await fetch("/api/buscar/"+valor);
-    const data = await res.json();
-
-    pintar(data);
-}
-
-// Enter para buscar
-document.getElementById("buscarDoc").addEventListener("keypress", function(e){
-    if(e.key === "Enter"){
-        buscarDocumento();
-    }
-});
-
-// ================= INIT =================
-
 cargarCatalogo();
 cargar();
-
 </script>
 
 </body>
