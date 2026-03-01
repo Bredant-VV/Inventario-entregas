@@ -8,12 +8,15 @@ app = Flask(__name__)
 app.secret_key = "clave_super_secreta"
 
 DATABASE_URL = os.environ.get("DATABASE_URL")
-print("DATABASE_URL:", DATABASE_URL)
+
+# ---------------- CONEXIÓN ----------------
 
 def get_db():
     if not DATABASE_URL:
         raise Exception("DATABASE_URL no configurada")
     return psycopg2.connect(DATABASE_URL, sslmode="require")
+
+# ---------------- CREAR TABLAS ----------------
 
 def init_db():
     conn = get_db()
@@ -40,6 +43,7 @@ def init_db():
         );
     """)
 
+    # Insertar catálogo inicial si está vacío
     cur.execute("SELECT COUNT(*) FROM catalogo;")
     total = cur.fetchone()[0]
 
@@ -61,6 +65,8 @@ def init_db():
 
 with app.app_context():
     init_db()
+
+# ---------------- VISTAS ----------------
 
 @app.route("/")
 def index():
@@ -85,23 +91,37 @@ def logout():
     session.clear()
     return redirect("/")
 
+# ---------------- API REGISTROS ----------------
+
+# Activos (para Admin)
 @app.route("/api/registros")
 def registros():
     conn = get_db()
     cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-    cur.execute("SELECT * FROM registros WHERE estado='activo'")
+    cur.execute("SELECT * FROM registros WHERE estado='activo' ORDER BY fecha DESC")
     rows = cur.fetchall()
     cur.close()
     conn.close()
     return jsonify([dict(r) for r in rows])
 
+# Entregados (para Mis entregas)
+@app.route("/api/mis_entregas")
+def mis_entregas():
+    conn = get_db()
+    cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+    cur.execute("SELECT * FROM registros WHERE estado='entregado' ORDER BY fecha DESC")
+    rows = cur.fetchall()
+    cur.close()
+    conn.close()
+    return jsonify([dict(r) for r in rows])
+
+# Agregar registro
 @app.route("/api/agregar", methods=["POST"])
 def agregar():
     if not session.get("admin"):
         return jsonify({"error":"No autorizado"}),403
 
     data = request.json
-
     conn = get_db()
     cur = conn.cursor()
 
@@ -120,14 +140,17 @@ def agregar():
             datetime.now().strftime("%Y-%m-%d %H:%M")
         ))
         conn.commit()
-    except:
+    except Exception:
         conn.rollback()
+        cur.close()
+        conn.close()
         return jsonify({"error":"ID ya existe"}),400
 
     cur.close()
     conn.close()
     return jsonify({"status":"ok"})
 
+# Marcar como entregado
 @app.route("/api/entregado/<id>", methods=["PUT"])
 def entregar(id):
     conn = get_db()
@@ -138,6 +161,7 @@ def entregar(id):
     conn.close()
     return jsonify({"status":"ok"})
 
+# Eliminar (marcar como eliminado)
 @app.route("/api/eliminar/<id>", methods=["DELETE"])
 def eliminar(id):
     conn = get_db()
@@ -148,6 +172,7 @@ def eliminar(id):
     conn.close()
     return jsonify({"status":"ok"})
 
+# Buscar por POO o Factura
 @app.route("/api/buscar/<valor>")
 def buscar(valor):
     conn = get_db()
@@ -163,6 +188,8 @@ def buscar(valor):
     conn.close()
 
     return jsonify([dict(r) for r in rows])
+
+# ---------------- API CATALOGO ----------------
 
 @app.route("/api/catalogo")
 def catalogo():
@@ -195,6 +222,8 @@ def agregar_catalogo():
     cur.close()
     conn.close()
     return jsonify({"status":"ok"})
+
+# ---------------- SERVIDOR ----------------
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))

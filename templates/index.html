@@ -1,26 +1,45 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Mis Entregas</title>
+    <title>Mis entregas</title>
     <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
 
-    <h1>Mis Entregas</h1>
-    <a href="/login">Administrador</a>
-    <div id="cards"></div>
+<h1>Mis entregas</h1>
+<a href="/login">Administrador</a>
 
-    <script>
-    async function cargar(){
-        const res=await fetch("/api/registros");
-        const data=await res.json();
-        document.getElementById("cards").innerHTML =
-            data.map(r=>`<div>
-                <b>${r.id}</b> - ${r.accesorio} - ${r.modelo} - ${r.nombre}
-            </div>`).join("");
+<hr>
+
+<div id="cards" class="cards"></div>
+
+<script>
+async function cargar() {
+    const res = await fetch("/api/mis_entregas");
+    const data = await res.json();
+
+    const cards = document.getElementById("cards");
+
+    if (data.length === 0) {
+        cards.innerHTML = "<p>No hay entregas registradas.</p>";
+        return;
     }
-    cargar();
-    </script>
+
+    cards.innerHTML = data.map(r => `
+        <div class="card">
+            <b>${r.id}</b>
+            <div>${r.accesorio}</div>
+            <div>${r.modelo}</div>
+            <div>${r.nombre}</div>
+            <div>POO: ${r.poo}</div>
+            <div>Factura: ${r.factura}</div>
+            <div>Fecha: ${r.fecha}</div>
+        </div>
+    `).join("");
+}
+
+cargar();
+</script>
 
 </body>
 </html>
