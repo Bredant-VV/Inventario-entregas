@@ -93,29 +93,25 @@ def logout():
 
 # ---------------- API REGISTROS ----------------
 
-# Activos (para Admin)
+# 🔹 Activos (estos son los que ve el usuario en "Mis entregas")
 @app.route("/api/registros")
 def registros():
     conn = get_db()
     cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-    cur.execute("SELECT * FROM registros WHERE estado='activo' ORDER BY fecha DESC")
+
+    cur.execute("""
+        SELECT * FROM registros
+        WHERE estado = 'activo'
+        ORDER BY fecha DESC
+    """)
+
     rows = cur.fetchall()
     cur.close()
     conn.close()
+
     return jsonify([dict(r) for r in rows])
 
-# Entregados (para Mis entregas)
-@app.route("/api/mis_entregas")
-def mis_entregas():
-    conn = get_db()
-    cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
-    cur.execute("SELECT * FROM registros WHERE estado='entregado' ORDER BY fecha DESC")
-    rows = cur.fetchall()
-    cur.close()
-    conn.close()
-    return jsonify([dict(r) for r in rows])
-
-# Agregar registro
+# 🔹 Agregar registro
 @app.route("/api/agregar", methods=["POST"])
 def agregar():
     if not session.get("admin"):
@@ -150,29 +146,43 @@ def agregar():
     conn.close()
     return jsonify({"status":"ok"})
 
-# Marcar como entregado
+# 🔹 Marcar como entregado (desaparece del usuario)
 @app.route("/api/entregado/<id>", methods=["PUT"])
 def entregar(id):
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("UPDATE registros SET estado='entregado' WHERE id=%s",(id,))
+
+    cur.execute("""
+        UPDATE registros
+        SET estado = 'entregado'
+        WHERE id = %s
+    """,(id,))
+
     conn.commit()
     cur.close()
     conn.close()
+
     return jsonify({"status":"ok"})
 
-# Eliminar (marcar como eliminado)
+# 🔹 Eliminar
 @app.route("/api/eliminar/<id>", methods=["DELETE"])
 def eliminar(id):
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("UPDATE registros SET estado='eliminado' WHERE id=%s",(id,))
+
+    cur.execute("""
+        UPDATE registros
+        SET estado = 'eliminado'
+        WHERE id = %s
+    """,(id,))
+
     conn.commit()
     cur.close()
     conn.close()
+
     return jsonify({"status":"ok"})
 
-# Buscar por POO o Factura
+# 🔹 Buscar por POO o Factura
 @app.route("/api/buscar/<valor>")
 def buscar(valor):
     conn = get_db()
@@ -195,8 +205,10 @@ def buscar(valor):
 def catalogo():
     conn = get_db()
     cur = conn.cursor(cursor_factory=psycopg2.extras.DictCursor)
+
     cur.execute("SELECT tipo, valor FROM catalogo")
     rows = cur.fetchall()
+
     cur.close()
     conn.close()
 
@@ -216,11 +228,16 @@ def agregar_catalogo():
     data = request.json
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("INSERT INTO catalogo (tipo, valor) VALUES (%s,%s)",
-                (data["tipo"], data["valor"]))
+
+    cur.execute("""
+        INSERT INTO catalogo (tipo, valor)
+        VALUES (%s,%s)
+    """,(data["tipo"], data["valor"]))
+
     conn.commit()
     cur.close()
     conn.close()
+
     return jsonify({"status":"ok"})
 
 # ---------------- SERVIDOR ----------------

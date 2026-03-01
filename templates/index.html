@@ -14,31 +14,30 @@
 <div id="cards" class="cards"></div>
 
 <script>
+
 async function cargar() {
-    const res = await fetch("/api/mis_entregas");
+    const res = await fetch("/api/registros");
     const data = await res.json();
 
-    const cards = document.getElementById("cards");
+    const contenedor = document.getElementById("cards");
 
     if (data.length === 0) {
-        cards.innerHTML = "<p>No hay entregas registradas.</p>";
+        contenedor.innerHTML = "<p>No hay pedidos pendientes.</p>";
         return;
     }
 
-    cards.innerHTML = data.map(r => `
+    contenedor.innerHTML = data.map(r => `
         <div class="card">
-            <b>${r.id}</b>
-            <div>${r.accesorio}</div>
-            <div>${r.modelo}</div>
-            <div>${r.nombre}</div>
-            <div>POO: ${r.poo}</div>
-            <div>Factura: ${r.factura}</div>
-            <div>Fecha: ${r.fecha}</div>
+            <h3>${r.id}</h3>
+            <p>${r.accesorio}</p>
+            <p>${r.modelo}</p>
+            <p>${r.nombre}</p>
         </div>
     `).join("");
 }
 
 cargar();
+
 </script>
 
 </body>
